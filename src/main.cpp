@@ -1,9 +1,15 @@
 #include <Arduino.h>
 #include "arduino_secrets.h"
 #include "WiFiNINA.h"
+#include "Adafruit_Sensor.h"
+#include "DHT.h"
+
+#define DHTPIN 7
+#define DHTTYPE DHT22
 
 // put function declarations here:
 void printWifiData();
+void printSensorData(float, float, float);
 
 //put global variables here:
 char ssid[] = SECRET_SSID;
@@ -22,9 +28,12 @@ unsigned long sensorPreviousTime = 0;
 
 bool print_info = false;
 
+DHT dht(DHTPIN, DHT22);
+
 void setup() {
   // put your setup code here, to run once:
   pinMode(LED, OUTPUT);
+  dht.begin();
   Serial.begin(9600);
 }
 
@@ -51,12 +60,24 @@ void loop() {
   unsigned long ledCurrentTime = millis();
 
   if((sensorCurrentTime - sensorPreviousTime) > sensorSamplingTime){
+    sensorPreviousTime = sensorCurrentTime;
     //To Do humidity Sampling
+    float h = dht.readHumidity();
+    float t = dht.readTemperature();
+
+    if(isnan(h) || isnan(t)){
+      Serial.println(F("Error reading sensor data for humidity and temperature"));
+      return;
+    }
+
+    //Calculate heat index in Celsius
+    float hic = dht.computeHeatIndex(t, h, false);
+    printSensorData(h, t, hic);
   }
 
   if((ledCurrentTime - ledPreviousTime) >= ledOnoffTime){
     ledPreviousTime = ledCurrentTime;
-    
+
     if(ledState == LOW){
       ledState = HIGH;
     } else {
@@ -84,4 +105,16 @@ void printWifiData() {
   Serial.print("Signal strenght RSSI: ");
   Serial.println(WiFi.RSSI());
   Serial.println("*************************************************");
+}
+
+//Print Sensor Data
+void printSensorData(float h, float t, float hic) {
+  Serial.print(F("Humidity: "));
+  Serial.print(h);
+  Serial.print(F("%  Temperature: "));
+  Serial.print(t);
+  Serial.print(F("°C "));
+  Serial.print(F("Heat index: "));
+  Serial.print(hic);
+  Serial.println(F("°C "));
 }
